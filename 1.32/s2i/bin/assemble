@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -e
+
+echo "---> Build started at $(date)"
+
+# Restore artifacts from the previous build (if they exist).
+#
+if [ "$(ls /tmp/artifacts/ 2>/dev/null)" ]; then
+  echo "---> Restoring build artifacts..."
+  CARGO_CACHE=${CARGO_HOME:-$HOME/.cargo}
+  CARGO_CACHE=`readlink -f $CARGO_CACHE`
+  CARGO_BASENAME=`basename ${CARGO_CACHE}`
+  TARGET_DIR="target"
+  TARGET_DIR=`readlink -f $TARGET_DIR`
+  TARGET_BASENAME=`basename ${TARGET_DIR}`
+
+  mv "/tmp/artifacts/${CARGO_BASENAME}" "${CARGO_CACHE}"
+  mv "/tmp/artifacts/${TARGET_BASENAME}" "${TARGET_DIR}"
+fi
+
+echo "---> Preparing source..."
+cp -Rf /tmp/src/. ./
+
+echo "---> Enabling rust-toolset-7..."
+source scl_source enable rust-toolset-7 || true
+
+if [ ! -z $PROXY ]; then
+  echo "---> Setting cargo http proxy to $PROXY"
+  mkdir -p $HOME/.cargo || true
+  echo "[http]"             >> $HOME/.cargo/config
+  echo "proxy = \"$PROXY\"" >> $HOME/.cargo/config
+fi
+
+echo "---> Installing application source..."
+cargo build --release
+
+echo "---> Build completed at $(date)"
+
+# Fix source directory permissions
+fix-permissions ./
